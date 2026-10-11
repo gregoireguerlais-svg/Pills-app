@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "Pills",
+    "slug": "pills-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Pills a besoin de vos photos pour ajouter un résultat d analyse.",
+        "NSCameraUsageDescription": "Pills utilise la caméra pour photographier vos résultats."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#FDEFE4",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "output": "server"
+    },
+    "scheme": "pills",
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {}
+      ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "b72b8627-952d-43a8-81be-7402e2e6a1ce"
+      }
+    },
+    "owner": "ggtest"
+  }
+}
