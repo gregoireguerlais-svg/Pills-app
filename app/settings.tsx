@@ -64,6 +64,7 @@ export default function Settings() {
       )}
       <Button label={saved ? 'Enregistré ✓' : 'Enregistrer'} onPress={save} />
       <Button variant="secondary" label="Revoir la présentation de Pills" onPress={() => router.push({ pathname: '/onboarding', params: { replay: '1' } })} />
+      <Button variant="secondary" label="Découvrir Pills Premium" onPress={() => router.push('/paywall')} />
       {/* __DEV__ : visible seulement pendant le développement (Expo Go), jamais dans une version publiée */}
       {__DEV__ && (
         <View style={{ gap: space.sm, marginTop: space.md }}>

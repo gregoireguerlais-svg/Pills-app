@@ -9,11 +9,14 @@ import { colors } from '../src/theme';
 import { WebAlertHost } from '../src/WebAlertHost';
 
 // Premier lancement : on montre la présentation (une seule fois)
+// Écrans accessibles pendant la présentation (ajout du premier médicament, réglages de la clé, offre)
+const ONBOARDING_OK = ['onboarding', 'add-medication', 'settings', 'paywall'];
+
 function OnboardingGate() {
   const { hydrated, onboarded } = useStore();
   const segments = useSegments();
   useEffect(() => {
-    if (hydrated && !onboarded && segments[0] !== 'onboarding') router.replace('/onboarding');
+    if (hydrated && !onboarded && !ONBOARDING_OK.includes(segments[0] ?? '')) router.replace('/onboarding');
   }, [hydrated, onboarded, segments]);
   return null;
 }
@@ -39,6 +42,7 @@ export default function RootLayout() {
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false, presentation: 'fullScreenModal' }} />
+        <Stack.Screen name="paywall" options={{ headerShown: false, gestureEnabled: false, presentation: 'fullScreenModal' }} />
         <Stack.Screen name="add-medication" options={{ title: 'Ajouter un médicament', presentation: 'modal' }} />
         <Stack.Screen name="add-result" options={{ title: 'Mes résultats', presentation: 'modal' }} />
         <Stack.Screen name="record/[id]" options={{ title: 'Résumé de mes résultats' }} />

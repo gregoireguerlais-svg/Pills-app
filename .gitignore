@@ -43,6 +43,6 @@ _to_delete/
 /data/
 
 # archive de test de la version web
-pills-dist.zip
+pills-dist*.zip
 .vercel
 .env*

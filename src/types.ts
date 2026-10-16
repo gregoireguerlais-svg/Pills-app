@@ -138,3 +138,10 @@ export type MedicalRecord = {
 // car seule la prescription du médecin décide du nombre de prises.
 export const MAX_SAFETY_INTERVAL_H = 12;
 export const safetyIntervalHours = (c: Constraints) => (c.minIntervalHours > 0 && c.minIntervalHours < MAX_SAFETY_INTERVAL_H ? c.minIntervalHours : 0);
+
+// Réponses au mini-questionnaire de l'onboarding (personnalisation des messages)
+export type OnboardingAnswers = {
+  who?: 'me' | 'relative' | 'both';
+  count?: '0' | '1-2' | '3-5' | '6+';
+  goals?: ('remember' | 'timing' | 'exams' | 'results')[];
+};

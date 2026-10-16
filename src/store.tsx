@@ -3,11 +3,11 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import { rescheduleReminders } from './notifications';
 import { nextOccurrence } from './dates';
 import { deleteRecordFiles } from './records';
-import { DEFAULT_PROFILE, Exam, MedicalRecord, Medication, Profile } from './types';
+import { DEFAULT_PROFILE, Exam, MedicalRecord, Medication, OnboardingAnswers, Profile } from './types';
 
 const KEY = 'pills.v1';
 
-type Persisted = { records: MedicalRecord[]; exams: Exam[]; meds: Medication[]; taken: Record<string, boolean>; profile: Profile; pins: Record<string, number>; skips: Record<string, boolean>; onboarded?: boolean };
+type Persisted = { records: MedicalRecord[]; exams: Exam[]; meds: Medication[]; taken: Record<string, boolean>; profile: Profile; pins: Record<string, number>; skips: Record<string, boolean>; onboarded?: boolean; onboardingAnswers?: OnboardingAnswers };
 type Ctx = Persisted & {
   hydrated: boolean;
   addMed: (m: Omit<Medication, 'id' | 'createdAt'>) => void;
@@ -26,7 +26,7 @@ type Ctx = Persisted & {
   skipsOf: (day: string) => string[];
   setSkip: (day: string, id: string) => void; // id = « medId#0 » ou « medId#* »
   clearSkips: (day: string) => void;
-  completeOnboarding: () => void; // présentation vue : on ne la remontre plus
+  completeOnboarding: (answers?: OnboardingAnswers) => void; // présentation vue : on ne la remontre plus
   todayPins: Record<string, number>;
   takenToday: string[]; // ids des prises déjà faites aujourd'hui
 };
@@ -166,7 +166,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const completeOnboarding = useCallback(() => setState((s) => ({ ...s, onboarded: true })), []);
+  const completeOnboarding = useCallback(
+    (answers?: OnboardingAnswers) => setState((s) => ({ ...s, onboarded: true, onboardingAnswers: answers ?? s.onboardingAnswers })),
+    [],
+  );
 
   const value = useMemo(
     () => ({ ...state, todayPins: todayPinsOf(state.pins), takenToday: takenIdsOf(state.taken), hydrated, addMed, updateMed, removeMed, addExam, updateExam, removeExam, addRecord, removeRecord, toggleTaken, setProfile, setPin, pinsOf, takenOf, skipsOf, setSkip, clearSkips, completeOnboarding }),
