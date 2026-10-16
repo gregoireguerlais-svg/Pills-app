@@ -1,10 +1,10 @@
 // Relais Pills (version web uniquement) : reçoit une demande d'analyse de l'app web,
 // ajoute la clé Claude API gardée secrète sur EAS Hosting (variable ANTHROPIC_API_KEY) et transmet à Claude.
-// Garde-fous : seulement depuis le site Pills, seulement les 3 analyses de Pills, modèle et taille imposés.
+// Garde-fous : seulement depuis le site Pills, seulement les 4 analyses de Pills, modèle et taille imposés.
 // Rien n'est enregistré ni journalisé ici : aucune donnée de santé ne reste sur le serveur.
 
 const MODEL = 'claude-sonnet-5-5';
-const ALLOWED_TOOLS = new Set(['record_constraints', 'record_exam_prep', 'record_result_summary']);
+const ALLOWED_TOOLS = new Set(['record_constraints', 'record_exam_prep', 'record_result_summary', 'record_prescription_meds']);
 const MAX_TOKENS = 4000;
 
 // Adresses autorisées : le site Pills (production et aperçus EAS) et l'ordinateur de développement

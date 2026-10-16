@@ -17,7 +17,29 @@ export const defaultSchedule = (): MedSchedule => ({ startDate: isoDay(), freque
 function matchesFrequency(f: Frequency, startDate: string, iso: string): boolean {
   if (f.type === 'daily') return true;
   if (f.type === 'interval') return daysBetween(startDate, iso) % Math.max(1, f.every) === 0;
+  if (f.type === 'every') {
+    const n = Math.max(1, f.every);
+    if (f.unit === 'day') return daysBetween(startDate, iso) % n === 0;
+    if (f.unit === 'week') return daysBetween(startDate, iso) % (7 * n) === 0;
+    // mois / années : même jour du mois que le début (ou le dernier jour du mois s'il est plus court, ex. 31 -> 30)
+    const a = parseDay(startDate);
+    const b = parseDay(iso);
+    const months = (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth());
+    if (months % (f.unit === 'year' ? 12 * n : n) !== 0) return false;
+    const lastDay = new Date(b.getFullYear(), b.getMonth() + 1, 0).getDate();
+    return b.getDate() === Math.min(a.getDate(), lastDay);
+  }
   return f.days.includes(parseDay(iso).getDay());
+}
+
+// Prochain jour de prise à partir d'aujourd'hui (utile pour les traitements espacés : « tous les 3 mois »)
+export function nextIntakeDay(med: Medication, from = isoDay()): string | null {
+  for (let i = 0; i < 3700; i++) {
+    const d = addDays(from, i);
+    if (med.schedule?.endDate && d > med.schedule.endDate) return null;
+    if (isActiveOn(med, d)) return d;
+  }
+  return null;
 }
 
 export function isActiveOn(med: Medication, iso: string): boolean {
@@ -43,6 +65,12 @@ export function courseProgress(med: Medication, iso = isoDay()): { current: numb
 export function frequencyLabel(f: Frequency): string {
   if (f.type === 'daily') return 'Tous les jours';
   if (f.type === 'interval') return f.every === 2 ? 'Un jour sur deux' : `Tous les ${f.every} jours`;
+  if (f.type === 'every') {
+    const n = Math.max(1, f.every);
+    const one = { day: 'Tous les jours', week: 'Toutes les semaines', month: 'Tous les mois', year: 'Tous les ans' }[f.unit];
+    const many = { day: `Tous les ${n} jours`, week: `Toutes les ${n} semaines`, month: `Tous les ${n} mois`, year: `Tous les ${n} ans` }[f.unit];
+    return n === 1 ? one : many;
+  }
   const labels = WEEKDAYS.filter((w) => f.days.includes(w.day)).map((w) => w.label);
   return labels.length ? labels.join(', ') : 'Aucun jour choisi';
 }
@@ -53,6 +81,11 @@ export function describeSchedule(med: Medication, today = isoDay()): string {
   if (!s) return 'Tous les jours';
   const parts = [frequencyLabel(s.frequency)];
   if (s.startDate > today) parts.push(`à partir du ${shortDate(s.startDate)}`);
+  // traitement espacé : on indique la prochaine prise si ce n'est pas aujourd'hui
+  if (s.frequency.type === 'every' && s.startDate <= today && !isActiveOn(med, today)) {
+    const next = nextIntakeDay(med, today);
+    if (next) parts.push(`prochaine prise le ${shortDate(next)}`);
+  }
   if (s.endDate) {
     if (s.endDate < today) return `Terminé le ${shortDate(s.endDate)}`;
     const total = durationDays(s)!;

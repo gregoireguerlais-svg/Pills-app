@@ -30,13 +30,16 @@ const PROMISES: { icon: keyof typeof Ionicons.glyphMap; title: string; text: str
 export default function Onboarding() {
   const { completeOnboarding } = useStore();
   const { replay } = useLocalSearchParams<{ replay?: string }>();
-  const width = useAppWidth();
+  const screenWidth = useAppWidth();
   const isWeb = Platform.OS === 'web'; // pas de rappels dans la version web
   const insets = useSafeAreaInsets(); // marges de l'iPhone (heure, encoche, barre du bas)
   const scroller = useRef<ScrollView>(null);
   const [step, setStep] = useState(0);
   const [asking, setAsking] = useState(false);
-  const [pageH, setPageH] = useState(0); // hauteur d'une page, pour centrer la mascotte (nécessaire sur le web)
+  // taille réelle de la zone des pages, mesurée à l'affichage (sur le web, la largeur de l'écran n'est pas connue au premier rendu)
+  const [box, setBox] = useState({ w: 0, h: 0 });
+  const width = box.w || screenWidth;
+  const pageH = box.h;
 
   const goTo = (i: number) => {
     scroller.current?.scrollTo({ x: i * width, animated: true });
@@ -46,7 +49,8 @@ export default function Onboarding() {
 
   const finish = () => {
     completeOnboarding();
-    if (replay) router.back();
+    // « Revoir la présentation » : on revient à l'écran d'avant… s'il existe (sur le web, la page peut avoir été ouverte directement)
+    if (replay && router.canGoBack()) router.back();
     else router.replace('/');
   };
   const enableReminders = async () => {
@@ -69,7 +73,7 @@ export default function Onboarding() {
         showsHorizontalScrollIndicator={false}
         contentInsetAdjustmentBehavior="never"
         onMomentumScrollEnd={onScrollEnd}
-        onLayout={(e) => setPageH(e.nativeEvent.layout.height)}
+        onLayout={(e) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}
         style={{ flex: 1 }}
       >
         {/* 1. Bienvenue */}

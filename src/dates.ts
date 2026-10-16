@@ -66,7 +66,7 @@ export const resultOf = (e: Exam, records: MedicalRecord[]) => records.find((r) 
 // Résultats en retard : plus de 24 h après l'heure de l'examen (début de journée si pas d'heure), sans résultats ajoutés.
 // Sert à la pastille rouge (onglet Examens, raccourci « Résultats », bouton « Ajouter mes résultats »).
 export function resultsOverdue(e: Exam, records: MedicalRecord[], now = Date.now()): boolean {
-  if (resultOf(e, records)) return false;
+  if (e.unscheduled || resultOf(e, records)) return false;
   const start = parseDay(e.date);
   if (e.time) {
     const [h, m] = e.time.split(':').map(Number);

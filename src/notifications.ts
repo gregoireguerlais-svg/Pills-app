@@ -88,6 +88,7 @@ export async function rescheduleReminders(input: {
   }
 
   for (const e of exams) {
+    if (e.unscheduled) continue; // pas encore de rendez-vous : pas de rappel
     const day = parseDay(e.date);
     // consignes à faire plusieurs jours avant (ex. arrêter un complément 3 jours avant)
     const byDay = new Map<number, string[]>();

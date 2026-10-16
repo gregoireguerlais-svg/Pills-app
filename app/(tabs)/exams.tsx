@@ -1,10 +1,12 @@
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { dayLabel, daysUntil, longDate, recurrenceLabel, resultOf, resultsOverdue } from '../../src/dates';
 import { ExamIcon } from '../../src/ExamIcon';
 import { ExamTags } from '../../src/ExamTags';
 import { RedDot } from '../../src/RedDot';
+import { Segmented } from '../../src/Segmented';
 import { useStore } from '../../src/store';
 import { Fab, FAB_SPACE } from '../../src/Fab';
 import { MascotScene } from '../../src/MascotScene';
@@ -27,12 +29,68 @@ export default function Exams() {
         { text: 'Supprimer', style: 'destructive', onPress: () => removeExam(e.id) },
       ],
     );
-  const visible = exams.filter((e) => e.recurrence || !resultOf(e, records)).sort((a, b) => a.date.localeCompare(b.date) || (a.time ?? '').localeCompare(b.time ?? ''));
+  // Deux sections : « Programmés » (avec une date de rendez-vous) et « Non programmés » (ordonnance reçue, rendez-vous à prendre)
+  const [section, setSection] = useState<'scheduled' | 'todo'>('scheduled');
+  const visible = exams
+    .filter((e) => !e.unscheduled && (e.recurrence || !resultOf(e, records)))
+    .sort((a, b) => a.date.localeCompare(b.date) || (a.time ?? '').localeCompare(b.time ?? ''));
+  const todo = exams.filter((e) => e.unscheduled).sort((a, b) => a.createdAt - b.createdAt);
 
   return (
     <View style={{ flex: 1 }}>
     <ScrollView contentContainerStyle={{ padding: space.md, paddingBottom: FAB_SPACE, gap: space.sm, flexGrow: 1 }}>
-      {visible.length === 0 ? (
+      <Segmented
+        tabs={[
+          { key: 'scheduled', label: `Programmés (${visible.length})` },
+          { key: 'todo', label: `Non programmés (${todo.length})` },
+        ]}
+        value={section}
+        onChange={setSection}
+        color={colors.exam}
+        softColor={colors.examSoft}
+      />
+      {section === 'todo' ? (
+        todo.length === 0 ? (
+          <EmptyState
+            illustration={<MascotScene icon="clipboard-text-clock-outline" tone="exam" />}
+            title="Aucun examen en attente"
+            text="Une ordonnance d’examen sans rendez-vous ? Ajoutez-la ici pour ne pas oublier de prendre rendez-vous."
+          />
+        ) : (
+          todo.map((e) => (
+            <SwipeToDelete key={e.id} onDelete={() => confirmDelete(e)}>
+              <Pressable onPress={() => router.push({ pathname: '/exam/[id]', params: { id: e.id } })} accessibilityLabel={`Ouvrir ${e.name}`}>
+                <Card style={{ gap: 6 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+                    <ExamIcon name={e.name} size={20} color={colors.exam} />
+                    <Text style={[font.h2, { flex: 1 }]}>{e.name}</Text>
+                    <Ionicons name="chevron-forward" size={22} color={colors.muted} />
+                  </View>
+                  {!!(e.description ?? e.prep.description) && <Text style={font.small}>{e.description ?? e.prep.description}</Text>}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <MaterialCommunityIcons name="calendar-question" size={18} color={colors.exam} />
+                    <Text style={font.small}>Rendez-vous à prendre</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.sm }}>
+                    <View style={{ flex: 1 }}>
+                      <ExamTags prep={e.prep} />
+                    </View>
+                    <Pressable
+                      onPress={() => router.push({ pathname: '/add-exam', params: { id: e.id, schedule: '1' } })}
+                      style={styles.resultsBtn}
+                      hitSlop={6}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Programmer ${e.name}`}
+                    >
+                      <Text style={styles.resultsTxt}>Programmer</Text>
+                    </Pressable>
+                  </View>
+                </Card>
+              </Pressable>
+            </SwipeToDelete>
+          ))
+        )
+      ) : visible.length === 0 ? (
         <EmptyState illustration={<MascotScene icon="stethoscope" tone="exam" />} title="Aucun examen prévu" text="Ajoutez un examen : Pills vous rappelle la veille et le matin, avec les consignes." />
       ) : (
         visible.map((e) => {
@@ -60,7 +118,12 @@ export default function Exams() {
                     </View>
                   )}
                 </View>
-                {e.recurrence && <Text style={font.small}>🔁 {recurrenceLabel(e.recurrence)}</Text>}
+                {e.recurrence && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <MaterialCommunityIcons name="repeat" size={18} color={colors.exam} />
+                    <Text style={font.small}>{recurrenceLabel(e.recurrence)}</Text>
+                  </View>
+                )}
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.sm }}>
                   <View style={{ flex: 1 }}>
                     <ExamTags prep={e.prep} />
@@ -85,7 +148,11 @@ export default function Exams() {
         })
       )}
     </ScrollView>
-    <Fab href={'/add-exam'} label="Ajouter un examen" color={colors.exam} />
+    <Fab
+      href={section === 'todo' ? { pathname: '/add-exam', params: { unscheduled: '1' } } : '/add-exam'}
+      label={section === 'todo' ? 'Ajouter un examen à programmer' : 'Ajouter un examen'}
+      color={colors.exam}
+    />
     </View>
   );
 }

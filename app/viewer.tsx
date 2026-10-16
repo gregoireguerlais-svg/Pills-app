@@ -14,8 +14,11 @@ export default function Viewer() {
   const { records, exams } = useStore();
   const files = folder === 'exams' ? exams.find((e) => e.id === id)?.prescription ?? [] : records.find((r) => r.id === id)?.files ?? [];
   const [page, setPage] = useState(Number(start) || 0);
-  const width = useAppWidth();
-  const [height, setHeight] = useState(0); // hauteur mesurée : sur le web, les pages n'ont sinon aucune hauteur
+  const screenWidth = useAppWidth();
+  // taille mesurée à l'affichage : sur le web, les pages n'ont sinon ni bonne largeur ni hauteur au premier rendu
+  const [box, setBox] = useState({ w: 0, h: 0 });
+  const width = box.w || screenWidth;
+  const height = box.h;
   if (files.length === 0) return <EmptyState emoji="📄" title="Document introuvable" text="Il a peut-être été supprimé." />;
 
   return (
@@ -23,7 +26,7 @@ export default function Viewer() {
       <FlatList
         data={files}
         horizontal
-        onLayout={(e) => setHeight(e.nativeEvent.layout.height)}
+        onLayout={(e) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}
         pagingEnabled
         initialScrollIndex={Math.min(page, files.length - 1)}
         getItemLayout={(_, i) => ({ length: width, offset: width * i, index: i })}

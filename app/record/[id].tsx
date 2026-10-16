@@ -72,6 +72,7 @@ export default function RecordDetail() {
           <ExamIcon name={record.title} size={26} color={colors.exam} />
           <Text style={[font.title, { flexShrink: 1 }]}>{record.title}</Text>
         </View>
+        {!!record.summary.subtitle && <Text style={[font.body, { color: colors.muted }]}>{record.summary.subtitle}</Text>}
         <Text style={font.small}>{longDate(record.date)}</Text>
       </View>
 

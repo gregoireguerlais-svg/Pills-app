@@ -2,9 +2,16 @@ import DateTimePicker from './DateTimePicker';
 import { useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { isoDay, longDate, parseDay } from './dates';
-import { durationDays, endDateFor, WEEKDAYS } from './medSchedule';
+import { durationDays, endDateFor, frequencyLabel, WEEKDAYS } from './medSchedule';
 import { colors, font, radius, space } from './theme';
-import { Frequency, MedSchedule } from './types';
+import { Frequency, FrequencyUnit, MedSchedule } from './types';
+
+const UNITS: { unit: FrequencyUnit; one: string; many: string }[] = [
+  { unit: 'day', one: 'jour', many: 'jours' },
+  { unit: 'week', one: 'semaine', many: 'semaines' },
+  { unit: 'month', one: 'mois', many: 'mois' },
+  { unit: 'year', one: 'an', many: 'ans' },
+];
 
 const DURATIONS: { label: string; days: number | null }[] = [
   { label: 'En continu', days: null },
@@ -40,7 +47,34 @@ export function ScheduleEditor({ value, onChange }: { value: MedSchedule; onChan
           {chip('Tous les jours', f.type === 'daily', () => setFrequency({ type: 'daily' }))}
           {chip('Un jour sur deux', f.type === 'interval' && f.every === 2, () => setFrequency({ type: 'interval', every: 2 }))}
           {chip('Certains jours', f.type === 'weekdays', () => setFrequency({ type: 'weekdays', days: [parseDay(value.startDate).getDay()] }))}
+          {chip('Autre', f.type === 'every', () => setFrequency({ type: 'every', every: 1, unit: 'week' }))}
         </View>
+        {/* « Autre » : tous les N jours / semaines / mois / ans (ex. vitamine D tous les 3 mois) */}
+        {f.type === 'every' && (
+          <View style={{ gap: space.sm }}>
+            <View style={[styles.row, { justifyContent: 'flex-start', gap: space.md }]}>
+              <Text style={font.body}>{f.unit === 'week' ? 'Toutes les' : 'Tous les'}</Text>
+              <Pressable
+                style={styles.stepBtn}
+                onPress={() => setFrequency({ ...f, every: Math.max(1, f.every - 1) })}
+                accessibilityRole="button"
+                accessibilityLabel="Moins"
+              >
+                <Text style={styles.stepTxt}>−</Text>
+              </Pressable>
+              <Text style={[font.h2, { minWidth: 28, textAlign: 'center' }]}>{f.every}</Text>
+              <Pressable style={styles.stepBtn} onPress={() => setFrequency({ ...f, every: Math.min(99, f.every + 1) })} accessibilityRole="button" accessibilityLabel="Plus">
+                <Text style={styles.stepTxt}>+</Text>
+              </Pressable>
+            </View>
+            <View style={styles.chips}>
+              {UNITS.map((u) => chip(f.every > 1 ? u.many : u.one, f.unit === u.unit, () => setFrequency({ ...f, unit: u.unit })))}
+            </View>
+            <Text style={font.small}>
+              {frequencyLabel(f)}, à partir du {longDate(value.startDate)}.
+            </Text>
+          </View>
+        )}
         {f.type === 'weekdays' && (
           <View style={styles.chips}>
             {WEEKDAYS.map((w) =>
@@ -104,5 +138,7 @@ const styles = StyleSheet.create({
   chip: { paddingHorizontal: space.md, minHeight: 44, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.peach, backgroundColor: colors.peachSoft, alignItems: 'center', justifyContent: 'center' },
   chipOn: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipTxt: { fontSize: 16, fontWeight: '600', color: colors.primary },
+  stepBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.peachSoft, borderWidth: 1, borderColor: colors.peach, alignItems: 'center', justifyContent: 'center' },
+  stepTxt: { fontSize: 24, color: colors.primary, lineHeight: 28 },
   input: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: space.md, minHeight: 48, width: 90, fontSize: 17, color: colors.text },
 });

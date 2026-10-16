@@ -1,6 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
-import { Constraints, ExamPrep, ResultSummary } from './types';
+import { Constraints, ExamPrep, Moment, ResultSummary } from './types';
 
 const MODEL = 'claude-sonnet-5-5';
 const KEY_NAME = 'anthropic_api_key';
@@ -175,6 +175,90 @@ export async function analyzeMedication(
   };
 }
 
+// Lecture d'une ordonnance de médicaments : on RECOPIE ce qui est écrit, médicament par médicament, sans rien inventer.
+// Chaque médicament est ensuite vérifié et validé un par un par la personne avant d'être ajouté.
+export type RxMed = {
+  name: string; // nom tel qu'écrit (marque ou molécule), sans le dosage
+  strength?: string; // dosage tel qu'écrit (« 1 g », « 20 mg »)
+  dose: string; // quantité par prise (« 1 comprimé », « 1 sachet »)
+  moments: Moment[];
+  momentsGuessed: boolean; // moments déduits d'un nombre de prises (« 2 fois par jour ») plutôt qu'écrits
+  durationDays?: number; // durée du traitement si indiquée
+  asNeeded: boolean; // « si besoin », « en cas de douleur »
+  repeat?: { every: number; unit: 'day' | 'week' | 'month' | 'year' }; // prise espacée (« 1 ampoule tous les 3 mois »)
+  asWritten: string; // la ligne de l'ordonnance, recopiée
+};
+
+export async function readPrescription(blocks: unknown[]): Promise<{ meds: RxMed[]; uncertainty?: string }> {
+  const raw = await callTool<{ meds?: (Omit<RxMed, 'moments' | 'momentsGuessed' | 'durationDays' | 'strength' | 'repeat'> & { repeat?: { every: number; unit: 'day' | 'week' | 'month' | 'year' }; moments?: string[]; momentsGuessed?: boolean; durationDays?: number | null; strength?: string })[]; uncertainty?: string }>({
+    maxTokens: 2500,
+    system:
+      SYSTEM_BASE +
+      " Tu lis une ordonnance de médicaments pour aider le patient à saisir son traitement dans son application. " +
+      "Tu RECOPIES fidèlement ce qui est écrit, médicament par médicament, dans l'ordre de l'ordonnance : tu n'ajoutes, ne corriges et ne complètes jamais une posologie. " +
+      "Pour chaque médicament : name = nom tel qu'écrit sans le dosage (ex. « Doliprane », « Amoxicilline ») ; strength = dosage écrit (« 1 g ») ; " +
+      "dose = quantité par prise (« 1 comprimé », « 2 gélules », « 1 sachet ») ; asWritten = la ligne de posologie recopiée telle quelle. " +
+      "moments parmi morning, noon, evening, bedtime : ceux écrits (« le soir » → evening, « au coucher » → bedtime) ; " +
+      "si seul un nombre de prises est écrit, déduis-les (1 fois/jour → morning ; 2 → morning, evening ; 3 → morning, noon, evening ; 4 → morning, noon, evening, bedtime) et mets momentsGuessed = true. " +
+      "durationDays = durée écrite en jours (« pendant 7 jours » → 7, « 1 mois » → 30), sinon vide. asNeeded = true si « si besoin », « en cas de douleur/fièvre ». " +
+      "repeat seulement si les prises ne sont pas quotidiennes : « 1 jour sur 2 » → every 2 unit day ; « 1 fois par semaine » → every 1 unit week ; « tous les 3 mois » → every 3 unit month ; sinon vide. " +
+      "Ignore ce qui n'est pas un médicament (renouvellements, analyses, matériel, mentions administratives). " +
+      "Si un nom ou une posologie est illisible ou ambigu, ne devine pas : laisse le champ vide et explique-le dans uncertainty. " +
+      "Si le document n'est pas une ordonnance de médicaments, renvoie une liste vide.",
+    content: [...blocks, { type: 'text', text: "Voici l'ordonnance. Liste les médicaments prescrits." }],
+    tool: {
+      name: 'record_prescription_meds',
+      description: "Enregistre les médicaments lus sur l'ordonnance",
+      input_schema: {
+        type: 'object',
+        properties: {
+          meds: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                name: { type: 'string' },
+                strength: { type: 'string' },
+                dose: { type: 'string' },
+                moments: { type: 'array', items: { type: 'string', enum: ['morning', 'noon', 'evening', 'bedtime'] } },
+                momentsGuessed: { type: 'boolean' },
+                durationDays: { type: 'number' },
+                asNeeded: { type: 'boolean' },
+                repeat: {
+                  type: 'object',
+                  properties: { every: { type: 'number' }, unit: { type: 'string', enum: ['day', 'week', 'month', 'year'] } },
+                  required: ['every', 'unit'],
+                },
+                asWritten: { type: 'string' },
+              },
+              required: ['name', 'dose', 'moments', 'momentsGuessed', 'asNeeded', 'asWritten'],
+            },
+          },
+          uncertainty: { type: 'string', description: 'Ce qui est illisible ou incertain, sinon vide' },
+        },
+        required: ['meds'],
+      },
+    },
+  });
+  const valid: Moment[] = ['morning', 'noon', 'evening', 'bedtime'];
+  return {
+    meds: (raw.meds ?? [])
+      .filter((m) => m.name && m.name.trim().length > 1)
+      .map((m) => ({
+        name: m.name.trim(),
+        strength: m.strength?.trim() || undefined,
+        dose: (m.dose ?? '').trim(),
+        moments: (m.moments ?? []).filter((x): x is Moment => valid.includes(x as Moment)),
+        momentsGuessed: !!m.momentsGuessed,
+        durationDays: m.durationDays && m.durationDays > 0 ? Math.round(m.durationDays) : undefined,
+        asNeeded: !!m.asNeeded,
+        repeat: m.repeat && m.repeat.every >= 1 && ['day', 'week', 'month', 'year'].includes(m.repeat.unit) ? { every: Math.round(m.repeat.every), unit: m.repeat.unit } : undefined,
+        asWritten: (m.asWritten ?? '').trim(),
+      })),
+    uncertainty: raw.uncertainty?.trim() || undefined,
+  };
+}
+
 export async function analyzeExam(name: string, date: string, prescriptionBlocks: unknown[] = []): Promise<ExamPrep> {
   const hasRx = prescriptionBlocks.length > 0;
   const text = `Examen : "${name || "à déduire de l'ordonnance"}"\nDate : ${date}${hasRx ? "\nL'ordonnance est jointe." : ''}`;
@@ -191,7 +275,11 @@ export async function analyzeExam(name: string, date: string, prescriptionBlocks
       "(ex. biotine / vitamine B8 avant un bilan thyroïdien ou hormonal) avec le délai d'arrêt usuel, en précisant de le confirmer avec le laboratoire. " +
       "Les consignes à faire plus d'un jour avant l'examen vont dans beforeSteps (daysBefore = nombre de jours avant). " +
       "Ne recommande jamais d'arrêter un médicament prescrit : dis de demander au médecin. " +
-      "Si l'ordonnance est illisible ou si tu as un doute, dis-le dans caution. 4 consignes maximum par liste, phrases courtes et concrètes, avec la raison quand elle aide. " +
+      "Si l'ordonnance est illisible ou si tu as un doute, dis-le dans caution. " +
+      "Format des listes (dayBefore, dayOf, beforeSteps) : UNE action par élément, style télégraphique, 10 mots max, sans point final, 4 éléments maximum " +
+      "(ex. « À jeun depuis la veille 20 h », « Eau plate autorisée », « Prendre vos médicaments habituels »). " +
+      "Regroupe les documents en un seul élément « À apporter : ordonnance, carte Vitale, mutuelle, anciens examens ». " +
+      "Uniquement ce que le patient doit faire AVANT d'arriver : pas de description du déroulé sur place (rester immobile, durée de l'examen, sensations), le personnel l'explique le jour même. " +
       'Rappelle que les consignes du médecin ou du laboratoire priment.',
     content: hasRx ? [...prescriptionBlocks, { type: 'text', text }] : text,
     tool: {
@@ -230,8 +318,8 @@ export async function analyzeExam(name: string, date: string, prescriptionBlocks
             items: { type: 'string' },
             description: "Autres contraintes clés du jour de l'examen, 0 à 2 étiquettes de 1 à 3 mots (ex. « Vessie pleine », « Venir accompagné », « Sans bijoux »). Ne pas répéter « À jeun ».",
           },
-          dayBefore: { type: 'array', items: { type: 'string' }, description: 'Consignes pour la veille (soir inclus)' },
-          dayOf: { type: 'array', items: { type: 'string' }, description: 'Consignes pour le matin / le jour même' },
+          dayBefore: { type: 'array', items: { type: 'string' }, description: 'Consignes pour la veille (soir inclus) : une action courte par élément' },
+          dayOf: { type: 'array', items: { type: 'string' }, description: 'Consignes pour le jour même, avant de partir : une action courte par élément, rien sur le déroulé de l’examen' },
           caution: { type: 'string', description: 'Rappel de prudence ou doute, vide si inutile' },
         },
         required: ['summary', 'fasting', 'dayBefore', 'dayOf'],
@@ -274,7 +362,8 @@ export async function summarizeResults(fileBlocks: unknown[], examName?: string)
         type: 'object',
         properties: {
           readable: { type: 'boolean' },
-          title: { type: 'string', description: 'Type de document, ex. « Bilan sanguin »' },
+          title: { type: 'string', description: 'Nom court du document, 1 à 4 mots, sans parenthèses ni détail, ex. « Bilan sanguin », « Courrier médical », « Échographie »' },
+          subtitle: { type: 'string', description: 'Précision courte (6 mots max) sur le contenu, ex. « Fer, vitamines, reins, foie » ; vide si inutile' },
           overview: { type: 'string', description: '2 à 3 phrases simples : ce que contient le document, sans conclure' },
           highlights: {
             type: 'array',

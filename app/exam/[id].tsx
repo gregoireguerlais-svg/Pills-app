@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -55,14 +55,45 @@ export default function ExamDetail() {
           </Pressable>
         )}
         {!!description && <Text style={font.small}>{description}</Text>}
-        <Text style={[font.body, { marginTop: 4 }]}>
-          📅 {longDate(e.date)}
-          {e.time ? ` à ${e.time}` : ''} · {n >= 0 ? dayLabel(n) : `il y a ${-n} jour${n < -1 ? 's' : ''}`}
-        </Text>
-        <Text style={font.small}>🔁 {recurrenceLabel(e.recurrence)}</Text>
+        {e.unscheduled ? (
+          // examen « non programmé » : pas encore de rendez-vous
+          <View style={{ gap: space.sm, marginTop: 4 }}>
+            <View style={styles.metaRow}>
+              <MaterialCommunityIcons name="calendar-question" size={20} color={colors.exam} />
+              <Text style={[font.body, { flex: 1 }]}>Rendez-vous à prendre</Text>
+            </View>
+            <Button tone="exam" label="Programmer cet examen" onPress={() => router.push({ pathname: '/add-exam', params: { id: e.id, schedule: '1' } })} />
+          </View>
+        ) : (
+          <>
+        {/* date et fréquence : un tap ouvre la modification de l'examen */}
+        <Pressable
+          onPress={() => router.push({ pathname: '/add-exam', params: { id: e.id } })}
+          style={({ pressed }) => [styles.metaRow, { marginTop: 4 }, pressed && { opacity: 0.6 }]}
+          accessibilityRole="button"
+          accessibilityLabel="Modifier la date de l’examen"
+        >
+          <MaterialCommunityIcons name="calendar-month-outline" size={20} color={colors.exam} />
+          <Text style={[font.body, { flex: 1 }]}>
+            {longDate(e.date)}
+            {e.time ? ` à ${e.time}` : ''} · {n >= 0 ? dayLabel(n) : `il y a ${-n} jour${n < -1 ? 's' : ''}`}
+          </Text>
+          <Ionicons name="pencil" size={16} color={colors.muted} />
+        </Pressable>
+        <Pressable
+          onPress={() => router.push({ pathname: '/add-exam', params: { id: e.id } })}
+          style={({ pressed }) => [styles.metaRow, pressed && { opacity: 0.6 }]}
+          accessibilityRole="button"
+          accessibilityLabel="Modifier la fréquence de l’examen"
+        >
+          <MaterialCommunityIcons name="repeat" size={20} color={colors.exam} />
+          <Text style={[font.small, { flex: 1 }]}>{recurrenceLabel(e.recurrence)}</Text>
+        </Pressable>
+          </>
+        )}
       </View>
 
-      {n <= 0 &&
+      {!e.unscheduled && n <= 0 &&
         (result ? (
           <Button tone="exam" variant="secondary" label="Voir le résumé de mes résultats" onPress={() => router.push({ pathname: '/record/[id]', params: { id: result.id } })} />
         ) : (
@@ -137,6 +168,7 @@ export default function ExamDetail() {
 }
 
 const styles = StyleSheet.create({
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm, minHeight: 32 },
   nameInput: { borderBottomWidth: 2, borderBottomColor: colors.primary, paddingVertical: 2 },
   rxThumb: { width: 120, height: 160, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.border },
 });

@@ -42,7 +42,7 @@ export default function Records() {
       ) : (
         <>
         {present.length >= 2 && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm, paddingBottom: space.xs }} style={{ marginHorizontal: -space.md }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm, paddingBottom: space.xs, alignItems: 'center' }} style={{ marginHorizontal: -space.md, flexGrow: 0 }}>
             <View style={{ width: space.md - space.sm }} />
             {chips.map((c) => {
               const on = active === c.key;
@@ -86,7 +86,7 @@ export default function Records() {
 }
 
 const styles = StyleSheet.create({
-  chip: { paddingHorizontal: 14, minHeight: 40, justifyContent: 'center', borderRadius: radius.lg, backgroundColor: colors.examSoft, borderWidth: 1, borderColor: colors.examBorder },
+  chip: { paddingHorizontal: 14, height: 40, alignSelf: 'center', justifyContent: 'center', borderRadius: radius.lg, backgroundColor: colors.examSoft, borderWidth: 1, borderColor: colors.examBorder },
   chipOn: { backgroundColor: colors.exam, borderColor: colors.exam },
   chipTxt: { fontSize: 16, color: colors.exam, fontWeight: '600' },
 });

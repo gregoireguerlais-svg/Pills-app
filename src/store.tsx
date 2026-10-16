@@ -57,6 +57,18 @@ const takenIdsOf = (taken: Record<string, boolean>, day = dayKey()) => {
 
 // Examens créés avant le 9 oct. : « Bilan sanguin avant chaque séance de traitement (prise de sang) »
 // -> nom « Prise de sang » + précision « Bilan sanguin avant chaque séance de traitement »
+// Anciens résultats au titre à rallonge : « Bilan sanguin (hémogramme, fer…) » -> titre « Bilan sanguin » + précision « Hémogramme, fer… »
+function shortenRecordTitles(records: MedicalRecord[]): MedicalRecord[] {
+  return records.map((r) => {
+    const m = r.title.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
+    if (r.title.length <= 30 || !m) return r;
+    const detail = m[2].trim();
+    const base = m[1].trim();
+    const title = base.length > 30 && /^(courrier|lettre)/i.test(base) ? 'Courrier médical' : base;
+    return { ...r, title, summary: { ...r.summary, subtitle: r.summary.subtitle ?? detail.charAt(0).toUpperCase() + detail.slice(1) } };
+  });
+}
+
 function shortenExamNames(exams: Exam[]): Exam[] {
   return exams.map((e) => {
     const m = e.name.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
@@ -80,7 +92,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         const limit = dayKey(new Date(Date.now() - 30 * 86400000));
         const pins: Record<string, number> = {};
         for (const [k, v] of Object.entries((saved.pins ?? {}) as Record<string, number>)) if (k.slice(0, 10) >= limit) pins[k] = v;
-        setState((s) => ({ ...s, ...saved, exams: shortenExamNames(saved.exams ?? []), records: saved.records ?? [], skips: saved.skips ?? {}, profile: { ...DEFAULT_PROFILE, ...(saved.profile ?? {}) }, pins }));
+        setState((s) => ({ ...s, ...saved, exams: shortenExamNames(saved.exams ?? []), records: shortenRecordTitles(saved.records ?? []), skips: saved.skips ?? {}, profile: { ...DEFAULT_PROFILE, ...(saved.profile ?? {}) }, pins }));
       })
       .catch(() => {})
       .finally(() => setHydrated(true));

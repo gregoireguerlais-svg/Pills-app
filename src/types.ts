@@ -18,7 +18,12 @@ export type Constraints = {
 export type Tip = { text: string; why?: string };
 
 // Fréquence : tous les jours, tous les N jours, ou certains jours de la semaine (0 = dimanche … 6 = samedi)
-export type Frequency = { type: 'daily' } | { type: 'interval'; every: number } | { type: 'weekdays'; days: number[] };
+export type FrequencyUnit = 'day' | 'week' | 'month' | 'year';
+export type Frequency =
+  | { type: 'daily' }
+  | { type: 'interval'; every: number } // tous les N jours (« un jour sur deux »)
+  | { type: 'weekdays'; days: number[] }
+  | { type: 'every'; every: number; unit: FrequencyUnit }; // « Autre » : tous les N jours / semaines / mois / ans
 // Période du traitement : date de début, date de fin facultative (incluse). Absent = tous les jours, en continu.
 export type MedSchedule = { startDate: string; endDate?: string; frequency: Frequency };
 
@@ -90,6 +95,7 @@ export type Exam = {
   name: string;
   description?: string; // courte précision sous le nom
   date: string; // YYYY-MM-DD (jour local) — pour un examen récurrent : la PROCHAINE occurrence
+  unscheduled?: boolean; // « Non programmé » : examen à faire, sans rendez-vous pris (date ignorée)
   time?: string; // HH:MM, heure du rendez-vous
   recurrence?: Recurrence | null;
   prescription?: RecordFile[]; // photo(s) / PDF de l'ordonnance, stockés dans documents/exams/<id>/
@@ -106,7 +112,8 @@ export type ResultPoint = {
 
 export type ResultSummary = {
   readable: boolean;
-  title: string;
+  title: string; // nom court du document (« Bilan sanguin »)
+  subtitle?: string; // précision courte (« Fer, vitamines, reins, foie »)
   overview: string;
   highlights?: string[]; // récap en puces courtes (« Fer et ferritine bas », « Fonction rénale normale »)
   points: ResultPoint[];

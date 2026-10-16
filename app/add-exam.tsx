@@ -15,7 +15,8 @@ import { Button, Card } from '../src/ui';
 
 export default function AddExam() {
   // Même écran pour ajouter (sans paramètre) et modifier (?id=…) un examen
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  // ?unscheduled=1 : ajout depuis « Non programmés » ; ?schedule=1 : on programme un examen qui n'avait pas de date
+  const { id, unscheduled, schedule } = useLocalSearchParams<{ id?: string; unscheduled?: string; schedule?: string }>();
   const { exams, addExam, updateExam } = useStore();
   const editing = exams.find((e) => e.id === id);
   const [name, setName] = useState(editing?.name ?? '');
@@ -23,6 +24,9 @@ export default function AddExam() {
   const [date, setDate] = useState(editing ? parseDay(editing.date) : new Date());
   const [time, setTime] = useState(editing?.time ?? '08:00');
   const [recurrence, setRecurrence] = useState<Recurrence | null>(editing?.recurrence ?? null);
+  // A-t-on déjà une date de rendez-vous ? Sinon l'examen va dans « Non programmés »
+  const [hasDate, setHasDate] = useState(editing ? !editing.unscheduled || schedule === '1' : unscheduled !== '1');
+  const askDate = !editing || !!editing.unscheduled; // la question n'a de sens qu'à l'ajout ou pour un examen pas encore programmé
   const [rxFiles, setRxFiles] = useState<PendingFile[]>([]); // ordonnance (facultative)
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -35,7 +39,7 @@ export default function AddExam() {
     setError(null);
     try {
       const blocks = rxFiles.length ? await toClaudeBlocks(rxFiles) : [];
-      setPrep(await analyzeExam(name.trim(), iso, blocks));
+      setPrep(await analyzeExam(name.trim(), hasDate ? iso : 'pas encore de rendez-vous', blocks));
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       if (msg === 'NO_API_KEY' || msg === 'BAD_API_KEY') setError('Clé API Claude manquante ou invalide. Ajoutez-la dans les réglages.');
@@ -51,7 +55,11 @@ export default function AddExam() {
   // Modification : nom, précision, date, heure, fréquence. Les consignes déjà générées sont conservées (pas de nouvel appel IA).
   const saveEdit = () => {
     if (!editing || name.trim().length < 2) return;
-    updateExam(editing.id, { name: name.trim(), description: description.trim() || undefined, date: iso, time, recurrence });
+    updateExam(editing.id, {
+      name: name.trim(),
+      description: description.trim() || undefined,
+      ...(hasDate ? { date: iso, time, recurrence, unscheduled: false } : { unscheduled: true }),
+    });
     router.back();
   };
 
@@ -61,7 +69,11 @@ export default function AddExam() {
     try {
       const id = Math.random().toString(36).slice(2, 10);
       const prescription = rxFiles.length ? await persistFiles(id, rxFiles, 'exams') : undefined;
-      addExam({ id, name: finalName, description: prep.description, date: iso, time, recurrence, prescription, prep });
+      addExam(
+        hasDate
+          ? { id, name: finalName, description: prep.description, date: iso, time, recurrence, prescription, prep }
+          : { id, name: finalName, description: prep.description, date: isoDay(), unscheduled: true, prescription, prep },
+      );
       router.back();
     } finally {
       setSaving(false);
@@ -70,7 +82,7 @@ export default function AddExam() {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      {editing && <Stack.Screen options={{ title: 'Modifier l’examen' }} />}
+      {editing && <Stack.Screen options={{ title: schedule === '1' ? 'Programmer l’examen' : 'Modifier l’examen' }} />}
       <ScrollView contentContainerStyle={{ padding: space.md, gap: space.md }} keyboardShouldPersistTaps="handled">
         {!prep ? (
           <>
@@ -103,6 +115,27 @@ export default function AddExam() {
               <DocumentPickerBlock files={rxFiles} onChange={setRxFiles} max={3} cameraLabel="Photographier l’ordonnance" tone="exam" />
             </View>
             )}
+            {askDate && (
+              <View style={{ gap: 6 }}>
+                <Text style={font.body}>Avez-vous déjà un rendez-vous ?</Text>
+                <View style={styles.chips}>
+                  {[
+                    { label: 'Oui, j’ai une date', value: true },
+                    { label: 'Pas encore', value: false },
+                  ].map((o) => {
+                    const on = hasDate === o.value;
+                    return (
+                      <Pressable key={o.label} style={[styles.chip, on && styles.chipOn]} onPress={() => setHasDate(o.value)} accessibilityRole="radio" accessibilityState={{ selected: on }}>
+                        <Text style={[styles.chipTxt, on && { color: '#fff' }]}>{o.label}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                {!hasDate && <Text style={font.small}>L’examen sera rangé dans « Non programmés » pour ne pas oublier de prendre rendez-vous. Vous ajouterez la date plus tard.</Text>}
+              </View>
+            )}
+            {hasDate && (
+            <>
             <View style={{ gap: 6 }}>
               <Text style={font.body}>Date</Text>
               <DateTimePicker
@@ -132,6 +165,8 @@ export default function AddExam() {
               </View>
               <Text style={font.small}>Si oui, Pills programme automatiquement le suivant dès que vous ajoutez vos résultats.</Text>
             </View>
+            </>
+            )}
             {error && <Text style={{ fontSize: 16, color: colors.danger }}>{error}</Text>}
 {editing ? (
               <Button tone="exam" label="Enregistrer" onPress={saveEdit} disabled={name.trim().length < 2} />
@@ -144,14 +179,12 @@ export default function AddExam() {
           <>
             <Card style={{ gap: 8 }}>
               <Text style={font.h2}>{finalName}</Text>
-              <Text style={font.small}>
-                {longDate(iso)} à {time} · {dayLabel(daysUntil(iso))}
-              </Text>
-              {recurrence && <Text style={font.small}>🔁 {recurrenceLabel(recurrence)}</Text>}
+              <Text style={font.small}>{hasDate ? `${longDate(iso)} à ${time} · ${dayLabel(daysUntil(iso))}` : 'Rendez-vous à prendre'}</Text>
+              {hasDate && recurrence && <Text style={font.small}>{recurrenceLabel(recurrence)}</Text>}
               <ExamPrepView prep={prep} />
             </Card>
             <Text style={font.small}>⚠️ Information générale générée par IA. Les consignes de votre médecin ou du laboratoire priment toujours.</Text>
-            <Button tone="exam" label="Confirmer et programmer les rappels" onPress={confirm} loading={saving} />
+            <Button tone="exam" label={hasDate ? 'Confirmer et programmer les rappels' : 'Ajouter à mes examens à programmer'} onPress={confirm} loading={saving} />
             <Button tone="exam" variant="secondary" label="Modifier" onPress={() => setPrep(null)} />
           </>
         )}

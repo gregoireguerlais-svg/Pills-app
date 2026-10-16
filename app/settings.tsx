@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { AddedToBox } from '../src/AddedAnimation';
 import { CelebrationToast, CourseDoneModal } from '../src/Celebration';
 import { getApiKey, setApiKey } from '../src/claude';
 import { useStore } from '../src/store';
@@ -15,7 +16,7 @@ export default function Settings() {
   const [draft, setDraft] = useState<Profile>(profile);
   const [saved, setSaved] = useState(false);
   // aperçu des animations de la mascotte (mode test uniquement)
-  const [preview, setPreview] = useState<'day' | 'course' | null>(null);
+  const [preview, setPreview] = useState<'day' | 'course' | 'added' | null>(null);
   const endPreview = useCallback(() => setPreview(null), []);
 
   useEffect(() => {
@@ -70,11 +71,13 @@ export default function Settings() {
           <Text style={font.small}>Pour tester. Cette partie n’apparaît pas dans la version finale.</Text>
           <Button variant="secondary" label="Journée terminée" onPress={() => setPreview('day')} />
           <Button variant="secondary" label="Traitement terminé" onPress={() => setPreview('course')} />
+          <Button variant="secondary" label="Médicament ajouté" onPress={() => setPreview('added')} />
         </View>
       )}
     </ScrollView>
     {preview === 'day' && <CelebrationToast onDone={endPreview} />}
     {preview === 'course' && <CourseDoneModal medName="Amoxicilline" days={14} onClose={endPreview} />}
+    {preview === 'added' && <AddedToBox name="Doliprane" onDone={endPreview} />}
     </View>
   );
 }

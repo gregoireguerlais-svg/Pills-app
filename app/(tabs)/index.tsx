@@ -21,7 +21,8 @@ import { Button, Card, EmptyState } from '../../src/ui';
 type Row = { kind: 'dose'; minutes: number; slot: Slot } | { kind: 'exam'; minutes: number; exam: Exam };
 
 export default function Today() {
-  const { meds, profile, pinsOf, takenOf, skipsOf, setSkip, clearSkips, taken, toggleTaken, exams, records } = useStore();
+  const { meds, profile, pinsOf, takenOf, skipsOf, setSkip, clearSkips, taken, toggleTaken, exams: allExams, records } = useStore();
+  const exams = allExams.filter((e) => !e.unscheduled); // les examens « non programmés » n'ont pas encore de date
   // Jour affiché : aujourd'hui par défaut, flèches pour voir les jours passés (historique) et à venir (planning prévu)
   const todayIso = isoDay();
   const [day, setDay] = useState(todayIso);
